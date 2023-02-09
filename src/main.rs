@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 fn main() {
-    let usage_s = String::from("Usage: ./kvstore [PUT|GET|SHOW] KEY VALUE");
+    let usage_s = String::from("Usage: ./kvstore [PUT|GET|SHOW|DROP] KEY VALUE");
     let mut arguments = std::env::args().skip(1);
     let fun_name = arguments.next().expect(&usage_s);
 
@@ -12,12 +12,20 @@ fn main() {
         "put" => {
             let key = arguments.next().expect(&usage_s);
             let val = arguments.next().expect(&usage_s);
-            database.put(key, val).expect("DB put failed!");
+            match database.put(key.clone(), val.clone()) {
+                Some(_) => println!("Replaced: {key} -> {val}"),
+                None => println!("Put: {key} -> {val}"),
+            }
         }
         "get" => {
             let key = arguments.next().expect(&usage_s);
             let val = database.get(&key).expect("Key not found.");
             println!("{key} -> {val}");
+        }
+        "drop" => {
+            let key = arguments.next().expect(&usage_s);
+            let val = database.drop(&key).expect("Key not found.");
+            println!("Dropped: {key} -> {val}");
         }
         "show" => {
             println!("Store:");
@@ -28,11 +36,10 @@ fn main() {
         _ => {
             // key = None;
             // val = None;
-            println!("Not valid!");
+            println!("{usage_s}");
         }
     }
-
-
+    database.commit().expect("Write failed!");
 }
 
 
@@ -41,10 +48,7 @@ struct Database {
 }
 
 impl Database {
-    pub fn put(&mut self, key: String, val: String) -> Result<(), std::io::Error> {
-        // insert a new k,v pair
-        println!("Did put {key} -> {val}");
-        self.map.insert(key, val);
+    pub fn commit(&mut self) -> Result<(), std::io::Error> {
         let mut lines: Vec<String> = Vec::new();
         for (k, v) in self.map.iter() {
             lines.push(format!("{k}\t{v}"))
@@ -53,8 +57,17 @@ impl Database {
         Ok(())
     }
 
-    pub fn get(&mut self, key: &String) -> Option<&String> {
-        self.map.get(key)
+    pub fn put(&mut self, key: String, val: String) -> Option<String> {
+        // insert a new k,v pair
+        self.map.insert(key, val)
+    }
+
+    pub fn get(&mut self, key: &String) -> Option<String> {
+        self.map.get(key).cloned()
+    }
+
+    pub fn drop(&mut self, key: &String) -> Option<String> {
+        self.map.remove(key)
     }
 
     fn new() -> Result<Database, std::io::Error>{
